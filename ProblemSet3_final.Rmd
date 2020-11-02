@@ -1,0 +1,382 @@
+---
+title: "Title of Your Report"
+author: "Names of your Group Members"
+date: "Due Date"
+output:
+  pdf_document: default
+  html_document:
+    df_print: paged
+---
+
+```{r setup, include=FALSE, message=FALSE}
+library(tidyverse)
+library(lme4)
+library(broom)
+
+
+# Loading in the cleaned survey Data
+survey_data <- read_csv("survey_data.csv")
+filtered_data_census <- read_csv("filtered_data_census.csv")
+
+
+# Loading in the cleaned census Data
+
+filtered_data_survey <- survey_data %>% 
+  filter(registration == "Registered" &
+    vote_intention != "No, I am not eligible to vote" &
+      vote_intention != "No, I will not vote but I am eligible"  & (vote_2020 == "Donald Trump" | vote_2020 == "Joe Biden"))
+
+filtered_data_survey<-na.omit(filtered_data_survey)
+
+
+
+####Map data style between survey & census####
+#####Create Age group in both datasets####
+
+filtered_data_survey <- filtered_data_survey %>% mutate(group_age = case_when(age <= 25 ~'25 or less',
+                                               age > 25 & age <= 40 ~ '26 to 40',
+                                               age > 40 & age <= 55 ~ '40 to 55',
+                                               age > 55 & age <= 70 ~ '55 to 70',
+                                               age > 70 ~ 'Above 70'))
+filtered_data_census <- filtered_data_census %>% mutate(group_age = case_when(age <= 25 ~'25 or less',
+                                               age > 25 & age <= 40 ~ '26 to 40',
+                                               age > 40 & age <= 55 ~ '40 to 55',
+                                               age > 55 & age <= 70 ~ '55 to 70',
+                                               age > 70 ~ 'Above 70'))
+
+
+
+#Map Sate/Stateicp#
+filtered_data_census<-filtered_data_census %>% mutate(state = case_when(stateicp == "alabama"~'AL',
+                                                        stateicp=="alaska"~'AK',
+                                                        stateicp=="arizona"~'AZ',
+                                                        stateicp=="arkansas"~'AR',
+                                                        stateicp=="california"~'CA',
+                                                        stateicp=="colorado"~'CO',
+                                                        stateicp=="connecticut"~'CT',
+                                                        stateicp=="delaware"~'DE',
+                                                        stateicp=="florida"~'FL',
+                                                        stateicp=="georgia"~'GA',
+                                                        stateicp=="hawaii"~"HI",
+                                                        stateicp=="idaho"~"ID",
+                                                        stateicp=="illinois"~"IL",
+                                                        stateicp=="indiana"~"IN",
+                                                        stateicp=="iowa"~"IA",
+                                                        stateicp=="kansas"~"KS",
+                                                        stateicp=="kentucky"~"KY",
+                                                        stateicp=="louisiana"~"LA",
+                                                        stateicp=="maine"~"ME",
+                                                        stateicp=="maryland"~"MD",
+                                                        stateicp=="massachusetts"~"MA",
+                                                        stateicp=="michigan"~"MI",
+                                                        stateicp=="minnesota"~"MN",
+                                                        stateicp=="mississippi"~"MS",
+                                                        stateicp=="missouri"~"MO",
+                                                        stateicp=="montana"~"MT",
+                                                        stateicp=="nebraska"~"NE",
+                                                        stateicp=="nevada"~"NV",
+                                                        stateicp=="new hampshire"~"NH",
+                                                        stateicp=="new jersey"~"NJ",
+                                                        stateicp=="new mexico"~"NM",
+                                                        stateicp=="new york"~"NY",
+                                                        stateicp=="north carolina"~"NC",
+                                                        stateicp=="north dakota"~"ND",
+                                                        stateicp=="ohio"~"OH",
+                                                        stateicp=="oklahoma"~"OK",
+                                                        stateicp=="oregon"~"OR",
+                                                        stateicp=="pennsylvania"~"PA",
+                                                        stateicp=="rhode island"~"RI",
+                                                        stateicp=="south carolina"~"SC",
+                                                        stateicp=="south dakota"~"SD",
+                                                        stateicp=="tennessee"~"TN",
+                                                        stateicp=="texas"~"TX",
+                                                        stateicp=="utah"~"UT",
+                                                        stateicp=="vermont"~"VT",
+                                                        stateicp=="virginia"~"VA",
+                                                        stateicp=="washington"~"WA",
+                                                        stateicp=="west virginia"~"WV",
+                                                        stateicp=="wisconsin"~"WI",
+                                                        stateicp=="wyoming"~"WY",
+                                                        stateicp=="district of columbia"~"DC")) 
+
+
+
+
+
+#region#
+unique(filtered_data_survey$race_ethnicity)
+length(unique(filtered_data_census$race))
+
+asians<-c("Asian (Vietnamese)","Asian (Asian Indian)","Asian (Korean)","Asian (Other)","Asian (Filipino)",
+              "Pacific Islander (Samoan)","Pacific Islander (Other)",
+              "Pacific Islander (Native Hawaiian)","Pacific Islander (Guamanian)")
+#survey data
+filtered_data_survey<-filtered_data_survey %>% 
+ mutate(race = case_when(race_ethnicity =="White" ~ 'White',
+                        race_ethnicity =="Some other race" ~ 'Other race',
+                       race_ethnicity=="American Indian or Alaska Native"~"American Indian or Alaska Native",
+   race_ethnicity =="Black, or African American" ~ 'Black, or African American',
+   race_ethnicity=="Other race "~"Other race",
+                        race_ethnicity =="Asian (Japanese)" ~ 'Japanese',
+                          race_ethnicity =="Asian (Chinese)" ~ 'Chinese',
+                          race_ethnicity %in% asians ~"other asian or pacific islander"
+                   
+                          
+  )) 
+
+filtered_data_survey$race_ethnicity<-NULL
+
+#census data
+filtered_data_census<-filtered_data_census %>% 
+  mutate(changed_race = case_when(race=="white"~"White",
+                           race=="chinese"~"Chinese",
+                           race=="black/african american/negro"~"Black, or African American",
+                           race=="two major races"~"Other race",
+                           race=="other race, nec"~"Other race",
+                           race=="japanese"~"Japanese",
+                           race=="american indian or alaska native"~"American Indian or Alaska Native",
+                           race=="three or more major races"~"Other race",
+                           race=="other asian or pacific islander"~"other asian or pacific islander"
+  )) 
+
+
+filtered_data_census$race<-filtered_data_census$changed_race
+filtered_data_census$race2<-NULL
+
+
+filtered_data_census <- filtered_data_census %>% mutate(gender = ifelse(filtered_data_census$sex=="female","Female","Male"))
+
+
+##edu##
+#Survey
+filtered_data_survey$education[filtered_data_survey$education=="Other post high school vocational training"]<-"High school graduate"
+filtered_data_survey$education[filtered_data_survey$education=="Completed some graduate, but no degree"]<-"College Degree (such as B.A., B.S.)"
+#Census
+grade3.less<-c("no schooling completed","nursery school, preschool","kindergarten","grade 1","grade 2","grade 3")
+grade4to8<-c("grade 4","grade 5","grade 6","grade 7","grade 8")
+grade9to11<-c("grade 9","grade 10","grade 11","12th grade, no diploma")
+edu.highsch<-c("ged or alternative credential","regular high school diploma")
+edu.somecoll<-c("some college, but less than 1 year",
+                "1 or more years of college credit, no degree")
+filtered_data_census<-filtered_data_census %>% 
+  mutate(changed_edu = case_when(educd=="doctoral degree"~'Doctorate degree',
+    educd =="associate's degree, type not specified" ~ 'Associate Degree',
+                             educd=="professional degree beyond a bachelor's degree" ~ "College Degree (such as B.A., B.S.)",
+                            educd =="master's degree" ~ 'Masters degree',
+                            educd =="bachelor's degree" ~ "College Degree (such as B.A., B.S.)",
+                            educd %in% edu.somecoll~"Completed some college, but no degree",
+                            educd %in% edu.highsch~"High school graduate",
+                            educd %in% grade9to11~"Completed some high school",
+                            educd %in% grade4to8~"Middle School - Grades 4 - 8",
+                            educd %in% grade3.less ~"3rd Grade or less"
+  )) 
+#drop educd & rename changed_edu#
+filtered_data_census<-rename(filtered_data_census,education=changed_edu)
+filtered_data_census$educd<-NULL
+
+
+#Populate Datset for modelling#
+dataset_survey <-filtered_data_survey%>% select(vote_2020,age,group_age,gender,education,state,household_income,race)
+dataset_census <-
+filtered_data_census%>% select(perwt,age,group_age,gender,education,state,race)
+rm(filtered_data_census,filtered_data_survey)
+
+#Create cell variable in both datasets#
+dataset_survey$cell<-paste(dataset_survey$gender,dataset_survey$race)
+dataset_census$cell<-paste(dataset_census$gender,dataset_census$race)
+
+
+#Convert variables to factors#
+f.cols.survey<-c("group_age","gender","education","state" ,"race", "cell","vote_2020")
+dataset_survey[f.cols.survey] <- lapply(dataset_survey[f.cols.survey], factor) 
+f.cols.census<-c("group_age","gender","education","state", "race", "cell")
+dataset_census[f.cols.census] <- lapply(dataset_census[f.cols.census], factor) 
+dataset_survey$vote_2020 <- relevel(dataset_survey$vote_2020, ref = "Donald Trump")    
+```
+
+```{r}
+####*****Multi-level regression*****####
+library(lme4)
+library(ROCR)
+library(tidybayes)
+library(caret)
+library(pROC)
+library(tidyverse)
+library(survey)
+
+
+####Model 1####
+model_log_1 <- glm(vote_2020 ~ gender+education+group_age+state,
+                     data = dataset_survey,family="binomial")
+
+summary(model_log_1)
+model1_AIC <-AIC(model_log_1,k=2)
+model1_BIC <- BIC(model_log_1)
+model1_AICandBIC <- c(model1_AIC,model1_BIC)
+model1_AICandBIC
+
+p_modle1<-predict(model_log_1,type=c('response'))
+final_model1<-ifelse(p_modle1>=0.5,"Joe Biden","Donald Trump")
+result1<-cbind(dataset_survey,final_model1)
+
+#roc curve
+roc_modle1 <- roc(result1$vote_2020, p_modle1)
+auc(roc_modle1)
+plot(roc_modle1, auc.polygon=TRUE, print.auc = TRUE,asp = NA)
+```
+
+
+```{r}
+####Model 2####
+model_log_2 <- glmer(vote_2020~(1|cell)+education+state+group_age ,
+                     data = dataset_survey, 
+                     family=binomial)
+
+summary(model_log_2)
+ranef(model_log_2)
+plot(model_log_2)
+
+p_modle2<-predict(model_log_2,type=c('response'))
+
+final_model2<-ifelse(p_modle2>=0.5,"Joe Biden","Donald Trump")
+result2<-cbind(dataset_survey,final_model2)
+
+
+roc_modle2 <- roc(result2$vote_2020, p_modle2)
+auc(roc_modle2)
+plot(roc_modle2, auc.polygon=TRUE, print.auc = TRUE,asp = NA)
+
+```
+
+
+
+
+```{r}
+####*****Post-Stratification*****####
+
+#using the census data to test#
+vote_p<-predict(model_log_2,dataset_census[,c("group_age","gender","education","state",
+                                          "race","cell")],type="response")
+predictions<-ifelse(vote_p>0.5,"Joe Biden","Donald Trump")
+
+census_fianlresult <- dataset_census %>% mutate(predictions= predictions)
+
+#person weight votes #
+
+census_fianlresult <- mutate(census_fianlresult, trump=ifelse(census_fianlresult$predictions=="Donald Trump",census_fianlresult$perwt,0))
+census_fianlresult <- mutate(census_fianlresult, biden=ifelse(census_fianlresult$predictions=="Joe Biden",census_fianlresult$perwt,0))
+
+
+#votes for each state#
+groupby_states <- census_fianlresult %>% group_by(state) %>% summarise(Trump=sum(trump),Biden=sum(biden))
+groupby_states$winner<-ifelse(groupby_states$Trump>groupby_states$Biden,
+                                "Donald Trump","Joe Biden")
+
+groupby_states
+####Mutate electoral votes per state ####
+groupby_states<-groupby_states %>% 
+  mutate(electoral_votes = case_when(state=="CA"~55,state=="TX"~38,state=="FL"~29,state=="NY"~29,state=="IL"~20,state=="PA"~20,state=="OH"~18,
+                                     state=="GA"~16,state=="MI"~16,state=="NC"~15,state=="NJ"~14,state=="VA"~13,state=="WA"~12,state=="AZ"~11,
+                                     state=="IN"~11,state=="MA"~11,state=="TN"~11,state=="MD"~10,state=="MN"~10,state=="MO"~10,state=="WI"~10,
+                                     state=="AL"~9,state=="CO"~9,state=="SC"~9,state=="KY"~8,state=="LA"~8,state=="CT"~7,state=="OK"~7,
+                                     state=="OR"~7,state=="AR"~6,state=="IA"~6,state=="KS"~6,state=="MS"~6,state=="NV"~6,state=="UT"~6,
+                                     state=="NE"~5,state=="NM"~5,state=="WV"~5,state=="HI"~4,state=="ID"~4,state=="ME"~4,state=="NH"~4,
+                                     state=="RI"~4,state=="AK"~3,state=="DE"~3,state=="MT"~3,state=="ND"~3,state=="SD"~3,state=="VT"~3,
+                                     state=="WY"~3,state=="DC"~3
+  )) 
+
+election_result <-groupby_states %>% 
+  group_by(winner) %>% 
+  summarise(total_votes=sum(electoral_votes))
+election_result
+
+```
+```{r}
+reduced_data <- census.data %>% 
+  count(cell, state, education, group_age) %>% 
+  group_by(cell)
+
+
+reduced_data$estimate <- predict(model_log_2, reduced_data, type='response')
+reduced_data <- reduced_data %>% mutate(cell_pro = n/ length(census.data$group_age))
+head(reduced_data)
+reduced_data <- reduced_data %>% mutate(alp_predict = estimate*cell_pro)
+sum(reduced_data$alp_predict)
+```
+
+
+```{r}
+reduced_data <- dataset_census %>% 
+  count(cell, state, education, group_age) %>% 
+  group_by(cell)
+summarise(reduced_data$cell)
+head(reduced_data)
+reduced_data$predict_column <- predict(model_log_2, reduced_data, type='response')
+reduced_data
+```
+
+
+# Title of your Report
+
+## Name(s) of Author(s) 
+## Date
+
+
+# Model
+
+Here we are interested in predicting the popular vote outcome of the 2020 American federal election (include citation). To do this we are employing a post-stratification technique. In the following sub-sections I will describe the model specifics and the post-stratification calculation.
+
+
+## Model Specifics
+I will (incorrectly) be using a linear regression model to model the proportion of voters who will vote for Donald Trump. This is a naive model. I will only be using age, which is recorded as a numeric variable, to model the probability of voting for Donald Trump. The simple linear regression model I am using is:
+
+$$ y = \beta_0+\beta_1  x_{age} + \epsilon$$
+
+Where $y$ represents the proportion of voters who will vote for Donald Trump. Similarly, $\beta_0$ represents the intercept of the model, and is the probability of voting for Donald Trump at age 0. Additionally, $\beta_1$ represents the slope of the model. So, for everyone one unit increase in age, we expect a $\beta_1$ increase in the probability of voting for Donald Trump.
+
+```{r, include=FALSE}
+
+# Creating the Model
+model <- glmer(vote_trump ~ age, 
+            data=survey_data, family = binomial)
+
+# Model Results (to Report in Results section)
+# summary(model)
+# OR
+# broom::tidy(model)
+
+```
+
+## Post-Stratification 
+
+In order to estimate the proportion of voters who will vote for Donald Trump I need to perform a post-stratification analysis. Here I create cells based off different ages. Using the model described in the previous sub-section I will estimate the proportion of voters in each age bin. I will then weight each proportion estimate (within each bin) by the respective population size of that bin and sum those values and divide that by the entire population size. 
+
+
+
+
+
+
+
+# Results
+
+Here you will include all results. This includes descriptive statistics, graphs, figures, tables, and model results. Please ensure that everything is well formatted and in a report style. You must also provide an explanation of the results in this section. 
+
+Please ensure that everything is well labelled. So if you have multiple histograms and plots, calling them Figure 1, 2, 3, etc. and referencing them as Figure 1, Figure 2, etc. in your report will be expected. The reader should not get lost in a sea of information. Make sure to have the results be clean, well formatted and digestible.
+
+# Discussion
+
+Here you will summarize the previous sections and discuss conclusions drawn from the results. Make sure to elaborate and connect your analysis to the goal of the study.
+
+## Weaknesses
+
+Here we discuss weaknesses of the study, data, analysis, etc. You can also discuss areas for improvement.
+
+## Next Steps
+
+Here you discuss subsequent work to be done after this report. This can include next steps in terms of statistical analysis (perhaps there is a more efficient algorithm available, or perhaps there is a caveat in the data that would allow for some new technique). Future steps should also be specified in terms of the study setting (eg. including a follow-up survey on something, or a subsequent study that would complement the conclusions of your report).
+
+
+# References
+
+
+
